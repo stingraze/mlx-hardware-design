@@ -7,3 +7,5 @@ Created using ChatGPT (o1 + GPT-4o)
 (C)Tsubasa Kato - Inspire Search - 2024/12/10
 https://www.inspiresearch.io/en
 
+Tested to work with M1 Pro on Macbook Pro - 16GB 
+
