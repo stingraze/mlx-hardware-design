@@ -9,3 +9,5 @@ https://www.inspiresearch.io/en
 
 Tested to work with M1 Pro on Macbook Pro - 16GB 
 
+Uses Flask (Python 3), and operates through a web browser.
+
