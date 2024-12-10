@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hardware Optimization with py4hw and mlx</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .form-section, .status-section, .mlx-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+        }
+        .form-section h2, .status-section h2, .mlx-section h2 {
+            margin-top: 0;
+        }
+        label {
+            display: inline-block;
+            width: 120px;
+        }
+        input, select {
+            margin-bottom: 10px;
+        }
+        #startButton {
+            padding: 8px 16px;
+            background: #28a745;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        #startButton:hover {
+            background: #218838;
+        }
+        #statusLog {
+            font-family: Consolas, monospace;
+            background: #f8f8f8;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 200px;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hardware Optimization Portal (py4hw + mlx)</h1>
+
+    <div class="form-section">
+        <h2>Start Optimization</h2>
+        <form id="startForm">
+            <div>
+                <label for="circuit_type">Circuit Type:</label>
+                <select id="circuit_type" name="circuit_type">
+                    <option value="adder">adder</option>
+                </select>
+            </div>
+            <div>
+                <label for="bitwidth">Bitwidth:</label>
+                <input type="number" id="bitwidth" name="bitwidth" value="8" min="1" />
+            </div>
+            <div>
+                <label for="generations">Generations:</label>
+                <input type="number" id="generations" name="generations" value="2" min="1" />
+            </div>
+            <div>
+                <label for="population_size">Population Size:</label>
+                <input type="number" id="population_size" name="population_size" value="6" min="1" />
+            </div>
+            <button id="startButton" type="button">Start</button>
+        </form>
+        <div id="startError" class="error"></div>
+    </div>
+
+    <div class="status-section" id="statusSection" style="display:none;">
+        <h2>Run Status</h2>
+        <p><strong>Run ID:</strong> <span id="run_id"></span></p>
+        <p><strong>Circuit Type:</strong> <span id="circuit_type_display"></span></p>
+        <p><strong>Bitwidth:</strong> <span id="bitwidth_display"></span></p>
+        <p><strong>Current Generation:</strong> <span id="current_generation"></span></p>
+        <p><strong>Total Generations:</strong> <span id="total_generations"></span></p>
+        <p><strong>Best Fitness:</strong> <span id="best_fitness"></span></p>
+        <p><strong>Best Params:</strong> <span id="best_params"></span></p>
+        <div>
+            <button id="nextGenButton" type="button">Next Generation</button>
+        </div>
+
+        <h3>Progress Log:</h3>
+        <div id="statusLog"></div>
+    </div>
+
+    <div class="mlx-section">
+        <h2>MLX Experiment Tracking</h2>
+        <p>This run uses <strong>py4hw</strong> for hardware evaluations and <strong>mlx</strong> for array operations and tracking. You can refer to mlx logs and artifacts for a detailed record of the run.</p>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        let runId = null;
+        let timer = null;
+
+        function updateLog(logArray) {
+            const logDiv = $("#statusLog");
+            logDiv.text(logArray.join("\n"));
+            logDiv.scrollTop(logDiv[0].scrollHeight);
+        }
+
+        function handleAjaxError(jqXHR, textStatus, errorThrown, errorElement) {
+            let errorMsg = "An error occurred.";
+            if (jqXHR.responseJSON && jqXHR.responseJSON.error) {
+                errorMsg = jqXHR.responseJSON.error;
+            } else if (errorThrown) {
+                errorMsg = "Error: " + errorThrown;
+            }
+            $(errorElement).text(errorMsg);
+            console.error("Request failed:", jqXHR, textStatus, errorThrown);
+        }
+
+        function fetchStatus() {
+            if (!runId) {
+                return;
+            }
+            $.getJSON('/status', { run_id: runId })
+            .done(function(data) {
+                $("#circuit_type_display").text(data.circuit_type);
+                $("#bitwidth_display").text(data.bitwidth);
+                $("#current_generation").text(data.current_generation);
+                $("#total_generations").text(data.total_generations);
+
+                if (data.best_design) {
+                    $("#best_fitness").text(data.best_design.fitness.toFixed(4));
+                    $("#best_params").text(JSON.stringify(data.best_design.params));
+                } else {
+                    $("#best_fitness").text("N/A");
+                    $("#best_params").text("N/A");
+                }
+
+                if (data.log) {
+                    updateLog(data.log);
+                }
+
+                if (data.current_generation >= data.total_generations) {
+                    clearInterval(timer);
+                    timer = null;
+                }
+            })
+            .fail(function(jqXHR, textStatus, errorThrown) {
+                handleAjaxError(jqXHR, textStatus, errorThrown, "#statusLog");
+            });
+        }
+
+        $(document).ready(function() {
+            $("#startButton").click(function() {
+                $("#startError").text("");
+                const formData = {
+                    circuit_type: $("#circuit_type").val(),
+                    bitwidth: $("#bitwidth").val(),
+                    generations: $("#generations").val(),
+                    population_size: $("#population_size").val()
+                };
+                $.post('/start', formData, function(data) {
+                    if (data.run_id) {
+                        runId = data.run_id;
+                        $("#run_id").text(runId);
+                        $("#statusSection").show();
+                        if (timer) clearInterval(timer);
+                        timer = setInterval(fetchStatus, 3000);
+                        fetchStatus();
+                    } else {
+                        $("#startError").text("No run_id returned from /start. Check server logs.");
+                    }
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    handleAjaxError(jqXHR, textStatus, errorThrown, "#startError");
+                });
+            });
+
+            $("#nextGenButton").click(function() {
+                if (!runId) {
+                    const errorMsg = "No run_id set, cannot advance generation.";
+                    $("#statusLog").append("\n" + errorMsg);
+                    return;
+                }
+                $.post('/next_generation', { run_id: runId }, function(data) {
+                    if (data.message) {
+                        fetchStatus();
+                    }
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    handleAjaxError(jqXHR, textStatus, errorThrown, "#statusLog");
+                });
+            });
+        });
+    </script>
+</body>
+</html>
