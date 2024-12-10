@@ -1,3 +1,5 @@
+#(C)Tsubasa Kato at Inspire Search Corp. - Made with ChatGPT (o1 + GPT-4o)
+# Version 0.1b - Last Updated on 12/10/2024 20:13PM JST
 import os
 from flask import Flask, request, jsonify, render_template
 import logging
