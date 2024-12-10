@@ -11,3 +11,4 @@ Tested to work with M1 Pro on Macbook Pro - 16GB
 
 Uses Flask (Python 3), and operates through a web browser.
 
+For the latest version (As of 12/10/2024 19:55PM) use app2.py.
